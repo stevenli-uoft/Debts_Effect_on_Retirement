@@ -1,12 +1,17 @@
 ---
-title: "Title"
+title: "The Impact of Household Debt on Retirement Preparedness in Canada"
+subtitle: "Analyzing Mortgage, Credit Card, and Student Loan Effects Across Age and Education Levels"
 author: 
   - Steven Li
-thanks: "Code and data are available at: "
+thanks: "Code and data are available at: [https://github.com/stevenli-uoft/Debts_Effect_on_Retirement](https://github.com/stevenli-uoft/Debts_Effect_on_Retirement)."
 date: today
 date-format: long
-abstract: "Abstract"
-format: pdf
+abstract: "Using data from Statistics Canada's 2019 Survey of Financial Security, we examine how different types of household debt affect retirement preparedness among Canadian households where the major income earner is aged 40 or older. Our analysis reveals that mortgage debt is positively associated with retirement preparedness in early to mid-career but this advantage diminishes significantly in later life stages, while student loan debt emerges as particularly concerning, with affected households showing retirement preparedness ratios 44% below their debt-free counterparts. The effects of debt on retirement preparedness vary systematically by age and education level, with university-educated households demonstrating significantly higher preparedness ratios than less-educated households, even after controlling for debt status. These findings suggest the need for targeted policy interventions, particularly those aimed at reducing student debt burdens and encouraging earlier mortgage paydown among older households to improve retirement outcomes."
+format:
+  pdf:
+    toc: true
+include-before: |
+  \newpage
 number-sections: true
 bibliography: references.bib
 ---
@@ -17,31 +22,460 @@ bibliography: references.bib
 #| message: false
 
 library(tidyverse)
+library(ggplot2)
+library(tibble)
 library(dplyr)
 library(knitr)
-library(lubridate)
-library(ggplot2)
+library(kableExtra)
+
+cleaned_data <- read_csv(here::here("data/cleaned_SFS.csv"))
 ```
-
-\newpage 
-
+ 
+\newpage
 # Introduction
+The intersection of household debt and retirement preparedness has become an increasingly critical issue in Canada's economic landscape. Recent data shows Canadian household debt has surpassed \$3 billion as of September 2024, with the average household carrying approximately \$41,500 in non-mortgage debt [@madeinca2024]. This rising debt burden occurs alongside concerning trends in retirement planning - over 35% of men and 28% of women report that financial factors are forcing them to postpone retirement [@mpamag2024]. Particularly concerning is that mortgage liabilities for Canadians aged 55-64 increased from \$244.2 billion in 2020 to \$315.7 billion in early 2024, while those 65 and older saw their mortgage debt surge from \$97.2 billion to $141.2 billion during the same period [@mpamag2024].
+
+Given these trends, this paper examines how different types of household debt affect retirement preparedness among Canadian households where the major income earner is aged 40 or older. While Canada maintains a strong public pension system that provides universal coverage and protects vulnerable groups' incomes, the proportion of retirement income from private sources remains among the highest in the OECD [@yoong2011]. This makes individual financial decisions and debt management crucial determinants of retirement security. Prior research suggests that medium and high-income households particularly face potential shortfalls in maintaining their standard of living in retirement [@yoong2011].
+
+Our analysis focuses on estimating the relationship between three major types of debt (mortgage, credit card, and student loan) and retirement preparedness, measured as the ratio of total retirement assets to annual after-tax income. We examine how these relationships vary across different age groups and education levels, using data from Statistics Canada's 2019 Survey of Financial Security (SFS). This comprehensive dataset allows us to control for important household characteristics while examining the complex interplay between debt holdings and retirement savings.
+
+The results reveal several important patterns: mortgage debt shows a positive association with retirement preparedness in early to mid-career, but this advantage diminishes significantly in later life stages. Student loan debt emerges as particularly concerning, with affected households showing retirement preparedness ratios 44% below their debt-free counterparts. Meanwhile, credit card debt demonstrates a relatively modest and statistically insignificant relationship with retirement readiness. These effects vary systematically across age groups and education levels, suggesting important life-cycle dimensions to debt's impact on retirement planning.
+
+Our research findings provide critical insights for ongoing policy discussions around retirement security in Canada. The Research Working Group on Retirement Income Adequacy has identified understanding individual investment choices as a key knowledge gap for developing sound retirement policy [@yoong2011]. Our findings suggest targeted interventions - particularly policies aimed at reducing student debt burdens and encouraging earlier mortgage paydown among older households - could significantly improve retirement preparedness.
+
+The remainder of this paper proceeds as follows. @sec-data describes our data sources and processing approach. @sec-model outlines our regression model methodology. @sec-results presents our models main results. @sec-discussion discusses the implications of our findings and potential directions for future research. The appendices provide supplementary materials, including additional figures in @sec-additional-figures, and additional model details in @sec-model-details.
+
 
 # Data {#sec-data}
+## Overview
+This study utilizes data from Statistics Canada's 2019 Survey of Financial Security (SFS) [@SFS2019], a comprehensive survey that captures detailed information about Canadian households' assets, debts, employment, income, and education. The SFS provides a thorough assessment of Canadians' financial health through data collected on major financial and non-financial assets, as well as various types of debt including mortgages, credit cards, and student loans.
+
+## Measurement and Limitations
+The SFS data collection occurred between September and December 2019 through computer-assisted personal interviews, and incorporated administrative data from personal tax records and the Pension Plans in Canada survey. The survey ensures high data quality through built-in questionnaire edits that detect logical inconsistencies and unusual values in the responses. However, several important limitations must be acknowledged when interpreting our studies results:
+
+- The survey excludes approximately 2% of the Canadian population, including territories, Indigenous settlements, military bases, and institutional residents. This may affect the generalizability of findings to these populations.
+- While the SFS is designed to provide reliable estimates for the top 5% of the net-worth distribution, the sample size is insufficient to representatively capture economic families with very high wealth.
+- Comparisons with other financial data sources suggest that the SFS tends to underestimate some net worth components, particularly financial assets and consumer debt, though estimates of real assets like homes and vehicles show better quality.
+
+## Data Processing
+Our data processing workflow involves several key steps to prepare the 2019 SFS dataset for analysis:
+
+1. **Variable Selection and Construction**
+
+  - Combine five retirement asset components to create total retirement assets:
+    * Employer pension plans (`PWARPPG`)
+    * RRSP investments (`PWARRSPL`)
+    * Retirement income funds (`PWARRIF`)
+    * Other retirement funds (`PWAOTPEN`)
+    * Tax-Free Savings Accounts (`PWATFS`)
+  - Create binary indicators for three types of debt:
+    * Mortgage debt (`PWDPRMOR`)
+    * Credit card debt (`PWDSTCRD`)
+    * Student loan debt (`PWDSLOAN`)
+  - Include survey weights (`PWEIGHT`) to ensure population representatives
+  
+2. **Sample Restrictions**
+  
+  - Exclude households with zero retirement assets to focus on active retirement planners
+  - Restrict sample to households where major income earner is aged 40 or older
+  - Remove observations with retirement preparedness ratios below 5th and above 95th percentiles
+  
+3. **Variable Transformations**
+  
+  - Create retirement preparedness ratio: total retirement assets divided by annual after-tax income
+  - Log-transform retirement preparedness ratio to address right-skewness
+  - Convert continuous debt variables to binary indicators
+
+All data cleaning and analysis was conducted using R [@RCoreTeam2023], with key packages including `tidyverse` [@tidyverse], and `dplyr` [@dplyr]. The resulting dataset forms the foundation for our analysis of how debt holding patterns relate to retirement preparedness across different demographic groups.
+
+## Outcome Variable
+Our primary outcome measure is the retirement preparedness ratio, calculated as total retirement assets divided by annual after-tax income. This ratio indicates how many years of current income could theoretically be replaced by accumulated retirement savings, providing a standardized measure of retirement readiness across different income levels.
+
+Notably, our analysis excludes households with zero retirement preparedness, as these cases represent a fundamentally different category from those who have begun accumulating retirement savings. Households with no retirement assets face distinct financial constraints and planning challenges that warrant separate analysis. By focusing on households with positive retirement preparedness, we can better examine the factors that influence the extent of retirement preparation among those who have begun retirement planning.
+
+As shown in @fig-retire-prep-hist, the retirement preparedness ratio exhibits substantial right-skewness, which is typical of financial ratios. @tbl-retire-stats in the appendix indicates a mean retirement preparedness ratio of 5.2, meaning Canadian households with major income earner aged 40 and above have, on average, accumulated retirement assets worth about 5.2 years of their current after-tax income. However, this average masks considerable variation, as the median ratio of 4.25 years suggests a rightward skew in the distribution, while the interquartile range from 1.8 to 7.8 years indicates substantial dispersion in retirement preparedness across households. This pattern reflects the cumulative nature of retirement savings, where factors like compound returns and varying saving behaviors can lead to wide differences in preparedness levels. 
+
+To address this distributional challenge and improve model fit, we apply a logarithmic transformation of the form `log(retirement_preparedness + 2)`. This transformation helps normalize the distribution and makes the regression results more interpretable while maintaining the meaningful zero point in the data. The right panel of @fig-retire-prep-hist demonstrates how this transformation achieves a more symmetric distribution that better satisfies the assumptions of our regression analysis.
+
+
+```{r}
+#| label: fig-retire-prep-hist
+#| fig-cap: "Distribution of Retirement Preparedness Ratios"
+#| echo: false
+#| warning: false
+#| message: false
+
+# Select the two columns you want to plot
+selected_columns <- cleaned_data %>% 
+  select(retirement_preparedness, retirement_preparedness_log)
+
+# Reshape the data to long format
+data_long <- selected_columns %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Values")
+
+ggplot(data_long, aes(x = Values, fill = Variable)) +
+  geom_histogram(alpha = 0.8, position = "identity", bins = 30) +
+  facet_wrap(~ Variable, scales = "free", ncol = 2) +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  labs(x = "Ratio", y = "Frequency")
+```
+
+
+## Predictor Variables
+Our analysis employs three binary debt indicators and two key demographic variables as predictors. For debt indicators, we construct binary variables that indicate whether a household has any mortgage debt, credit card debt, or student loan debt, rather than using continuous debt amounts. Due to the nature of financial data, continuous debt amount distributions are heavily skewed, as seen in @fig-mortgage-hist, @fig-cc-hist, and @fig-student-hist. Therefore, creating a binary indicator allows us to clearly identify how the mere presence of different debt types correlates with retirement preparedness while avoiding the statistical challenges posed by heavily skewed debt distributions.
+
+@fig-debt-age reveals notable patterns in debt holding across age groups. Mortgage debt shows the most pronounced life-cycle pattern, with over 65% of households aged 40-44 holding mortgages, declining steadily to about 10% for those aged 80 and above. This pattern aligns with typical life-cycle borrowing behavior where households aim to pay off housing debt before retirement. Credit card debt follows a similar but less steep decline, from about 48% among younger households to 10% in the oldest age group, suggesting that revolving debt remains a relevant concern even in later life stages. Student loan debt, while less prevalent overall, maintains a relatively stable presence of around 8-10%. Notably, student loan debt is the highest among the 55-59 age group, potentially reflecting persistent personal education debt, or children's education loan, as the SFS data is on the household level.
+
+The relationship between education levels and debt holding, shown in @fig-debt-edu, presents several interesting patterns. The number of households with mortgage debt increases with education level of the major income earner, from about 23% among those with less than high school education to over 40% among university graduates. This pattern likely reflects both higher earning potential and greater access to credit among more educated households. Credit card debt shows a similar positive association with education, though the relationship is less pronounced. Student loan debt demonstrates the expected pattern of higher prevalence among those with post-secondary education, particularly among university graduates, reflecting the financing needs associated with higher education.
+
+We include both age and education as critical control variables in our analysis. Age groups capture life-cycle effects in both debt accumulation and retirement saving patterns, while education levels control for systematic differences in financial behavior and economic opportunities. The interaction terms between debt indicators and age groups allow us to examine how the relationship between debt holding and retirement preparedness varies across the life cycle, providing insights into the potentially different implications of carrying debt at different life stages.
+
+
+```{r}
+#| label: fig-debt-age
+#| fig-cap: "Distribution of Household Debt by Age Group"
+#| echo: false
+#| warning: false
+#| message: false
+
+age_debt_data <- cleaned_data %>%
+  mutate(pagemieg = factor(pagemieg)) %>%
+  group_by(pagemieg) %>%
+  summarise(
+    "Mortgage" = mean(has_mortage == 1) * 100,
+    "Credit Card" = mean(has_cc == 1) * 100,
+    "Student Loan" = mean(has_student == 1) * 100
+  ) %>%
+  pivot_longer(
+    cols = c("Mortgage", "Credit Card", "Student Loan"),
+    names_to = "debt_type",
+    values_to = "percentage"
+  )
+
+ggplot(age_debt_data, aes(x = pagemieg, y = percentage, fill = debt_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_discrete(labels = c("40-44", "45-49", "50-54", "55-59", "60-64", 
+                              "65-69", "70-74", "75-79", "80+")) +
+  labs(x = "Age Group", y = "Percentage of Households", fill = "Debt Type") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+```{r}
+#| label: fig-debt-edu
+#| fig-cap: "Distribution of Household Debt by Education Level"
+#| echo: false
+#| warning: false
+#| message: false
+
+edu_debt_data <- cleaned_data %>%
+  mutate(peducmie = factor(peducmie)) %>%
+  group_by(peducmie) %>%
+  summarise(
+    "Mortgage" = mean(has_mortage == 1) * 100,
+    "Credit Card" = mean(has_cc == 1) * 100,
+    "Student Loan" = mean(has_student == 1) * 100
+  ) %>%
+  pivot_longer(
+    cols = c("Mortgage", "Credit Card", "Student Loan"),
+    names_to = "debt_type",
+    values_to = "percentage"
+  )
+
+ggplot(edu_debt_data, aes(x = peducmie, y = percentage, fill = debt_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_discrete(labels = c("Less than Highschool", "Highschool", "Post-secondary", 
+                              "University", "Not Stated")) +
+  labs(x = "Education Level", y = "Percentage of Households", fill = "Debt Type") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
 
 # Model {#sec-model}
+Our analysis employs a multi-linear regression framework to examine how different types of debt affect retirement preparedness across various age groups and education levels. This approach allows us to analyze how the presence of different debt types correlates with retirement preparedness while controlling for demographic factors.
+
+The model incorporates three key binary debt indicators (mortgage, credit card, and student loan debt) along with interaction terms between each debt indicator and age groups. These interactions are crucial as they capture how debt effects may vary across life stages, acknowledging that the impact of carrying debt on retirement preparedness likely differs based on a household's life cycle stage. To ensure reliable statistical inference and intuitive interpretation, we log-transform our dependent variable to address its right-skewed distribution.
+
+The model is formally specified as:
+
+\begin{align*}
+\log(RP_i + 2) = & \beta_0 + \beta_1D^M_i + \beta_2D^C_i + \beta_3D^S_i \\
+& + \sum_{j=1}^{J} \gamma_j \text{Age}_j + \sum_{k=1}^{K} \delta_k \text{Education}_k \\
+& + \sum_{j=1}^{J} \theta_{1j}D^M_i \times \text{Age}_j \\
+& + \sum_{j=1}^{J} \theta_{2j}D^C_i \times \text{Age}_j \\
+& + \sum_{j=1}^{J} \theta_{3j}D^S_i \times \text{Age}_j + \epsilon_i
+\end{align*}
+
+where $RP_i$ represents the retirement preparedness ratio, $D^M_i$, $D^C_i$, $D^S_i$ are binary debt indicators, and the coefficients capture both direct effects and age-group interactions. Survey weights are applied in estimation to maintain population representativeness. Detailed discussions of model assumptions and robustness checks are provided in Appendix @sec-model
+
+This modeling approach provides a clear framework for understanding how the presence of different types of debt relates to retirement preparedness while accounting for key demographic factors and life-cycle effects. The simplified treatment of debt through binary indicators, combined with demographic controls and interaction terms, allows us to isolate and interpret the relationship between debt holding patterns and retirement preparation across different life stages.
 
 # Results {#sec-results}
+Our regression analysis of the relationship between debt holding patterns and retirement preparedness yields several significant findings. While the model's overall explanatory power is modest ($R^2$ = 0.139, adjusted $R^2$ = 0.133), numerous coefficients achieve statistical significance at conventional levels, providing valuable insights into how different types of debt relate to retirement preparedness.
+
+A detailed breakdown of model coefficients, standard errors, and p-values are provided in @tbl-model-results
+
+## Direct Effects of Debt Types
+Beginning with the main effects, our baseline scenario represents households with no debt, major income earner aged 40-44, and lowest education level. After reverting the log-transformed ratio, we get:
+
+\begin{align*}
+(RP + 2) = exp(intercept) = exp(1.156) = 3.178 \\
+RP = 3.178 - 2 = 1.178
+\end{align*}
+
+This baseline household has retirement assets worth approximately 1.178 times their annual after-tax income. Relative to this baseline, mortgage debt shows a positive association with retirement preparedness ($\beta$ = 0.096, p < 0.05).
+
+\begin{align*}
+(RP + 2) = exp(intercept) * exp(0.096) = 3.178 * 1.101 = 3.503 \\
+RP = 3.503 - 2 = 1.503
+\end{align*}
+
+This translate to households with mortgage debt having a 27.6% increase in retirement preparedness from 1.178 to approximately 1.503. Households with credit card debt exhibits a negative but statistically insignificant effect ($\beta$ = -0.060, p = 0.173), while student loan debt demonstrates a strong negative relationship ($\beta$ = -0.177, p < 0.01), reducing retirement preparedness from 1.178 to about 0.66 times annual income, a substantial 44% decrease.
+
+## Age and Education Level Effects
+Age effects demonstrate a clear pattern of increasing retirement preparedness as households age. While the initial increase from baseline is moderate for ages 45-49 ($\beta$ = 0.123, p = 0.051), representing an increase to 1.594 times annual income, we observe substantial increases for ages 50-54 ($\beta$ = 0.333, p < 0.001), reaching 2.429 times annual income. The effect strengthens through the middle age groups, reaching its peak in the 65-69 age group ($\beta$ = 0.647, p < 0.001), where retirement assets reach 4.07 times annual income (245% increase from baseline). The effect moderates somewhat but remains significant for the oldest age groups, with those 80 and above ($\beta$ = 0.416, p < 0.001) maintaining retirement assets at 2.82 times annual income (139% increase).
+
+Education levels consistently show positive and significant effects on retirement preparedness. The magnitude of these effects increases with education level, from high school completion ($\beta$ = 0.143, p < 0.001) raising preparedness to 1.66 times annual income, to post-secondary education ($\beta$ = 0.214, p < 0.001) reaching 1.93 times annual income, and peaking with university degrees ($\beta$ = 0.327, p < 0.001) at 2.41 times annual income (105% increase).
+
+## Interaction Effects
+The interaction terms between debt types and age groups reveal important nuances in how debt effects vary across the life cycle. Most notably, the positive association with mortgage debt diminishes for older age groups, with significant negative interactions appearing at ages 60-64 ($\beta$ = -0.166, p < 0.05) and 75-79 ($\beta$ = -0.251, p < 0.05). For instance, while having a mortgage at younger ages increases retirement preparedness, by age 60-64 this advantage is reduced by about 15.4%. Student loan interactions show particularly strong negative effects in the 65-69 age group ($\beta$ = -0.419, p < 0.05) and 75-79 age group ($\beta$ = -0.237, p < 0.05), with the 65-69 age group interaction reducing retirement preparedness by an additional 34.2% beyond the main effect of student debt. Credit card debt interactions, while varying across age groups, generally lack statistical significance.
+
+These results point to complex relationships between debt holding and retirement preparedness that vary substantially across the life cycle and education levels. The implications of these patterns for policy and financial planning will be explored in detail in the Discussion section.
+
+```{r}
+#| label: tbl-model-results
+#| tbl-cap: "Multi-Linear Regression Model Results"
+#| echo: false
+#| warning: false
+#| message: false
+
+saved_model <- readRDS(here::here("models/retirement_debt_model.rds"))
+
+retirement_model <- saved_model$model
+model_results <- saved_model$results
+
+term_names <- c(
+  "(Intercept)" = "Intercept",
+  "has_mortage1" = "Has Mortgage Debt",
+  "has_cc1" = "Has Credit Card Debt",
+  "has_student1" = "Has Student Loan",
+  "pagemieg6" = "Age 40-44",
+  "pagemieg7" = "Age 45-49",
+  "pagemieg8" = "Age 50-54",
+  "pagemieg9" = "Age 55-59",
+  "pagemieg10" = "Age 60-64",
+  "pagemieg11" = "Age 65-69",
+  "pagemieg12" = "Age 70-74",
+  "pagemieg13" = "Age 75-79",
+  "pagemieg14" = "Age 80+",
+  "peducmie1" = "< Highschool",
+  "peducmie2" = "Highschool",
+  "peducmie3" = "Post-secondary",
+  "peducmie4" = "University",
+  "peducmie9" = "Education Not Stated",
+  
+  "has_mortage1:pagemieg6" = "Mortgage x Age 40-44",
+  "has_mortage1:pagemieg7" = "Mortgage x Age 45-49",
+  "has_mortage1:pagemieg8" = "Mortgage x Age 50-54",
+  "has_mortage1:pagemieg9" = "Mortgage x Age 55-59",
+  "has_mortage1:pagemieg10" = "Mortgage x Age 60-64",
+  "has_mortage1:pagemieg11" = "Mortgage x Age 65-69",
+  "has_mortage1:pagemieg12" = "Mortgage x Age 70-74",
+  "has_mortage1:pagemieg13" = "Mortgage x Age 75-79",
+  "has_mortage1:pagemieg14" = "Mortgage x Age 80+",
+  
+  "has_cc1:pagemieg6" = "Credit Card x Age 40-44",
+  "has_cc1:pagemieg7" = "Credit Card x Age 45-49",
+  "has_cc1:pagemieg8" = "Credit Card x Age 50-54",
+  "has_cc1:pagemieg9" = "Credit Card x Age 55-59",
+  "has_cc1:pagemieg10" = "Credit Card x Age 60-64",
+  "has_cc1:pagemieg11" = "Credit Card x Age 65-69",
+  "has_cc1:pagemieg12" = "Credit Card x Age 70-74",
+  "has_cc1:pagemieg13" = "Credit Card x Age 75-79",
+  "has_cc1:pagemieg14" = "Credit Card x Age 80+",
+  
+  "has_student1:pagemieg6" = "Student Loan x Age 40-44",
+  "has_student1:pagemieg7" = "Student Loan x Age 45-49",
+  "has_student1:pagemieg8" = "Student Loan x Age 50-54",
+  "has_student1:pagemieg9" = "Student Loan x Age 55-59",
+  "has_student1:pagemieg10" = "Student Loan x Age 60-64",
+  "has_student1:pagemieg11" = "Student Loan x Age 65-69",
+  "has_student1:pagemieg12" = "Student Loan x Age 70-74",
+  "has_student1:pagemieg13" = "Student Loan x Age 75-79",
+  "has_student1:pagemieg14" = "Student Loan x Age 80+"
+)
+
+model_results <- model_results %>%
+  mutate(term = recode(term, !!!term_names))
+
+result_table <- model_results %>%
+  select(term, estimate, std.error, p.value) %>%
+  mutate(across(c(estimate, std.error, p.value), ~ round(.x, digits = 3)))
+
+kable(result_table)
+```
 
 # Discussion {#sec-discussion}
+## Key Empirical Findings
+Our analysis reveals several important patterns in how different types of debt relate to retirement preparedness among Canadian households. First, the relationship between mortgage debt and retirement preparedness exhibits a clear life-cycle pattern. In early to mid-career (40s to early 50s), having a mortgage is associated with higher retirement preparedness, with these households showing retirement assets approximately 27.6% higher than their non-mortgaged peers. This positive association likely reflects underlying factors such as financial stability, credit access, and systematic saving behavior rather than a direct causal effect of the mortgage itself. However, this advantage diminishes significantly in later life stages, particularly after age 70, as shown in @fig-retire-age-group. This suggests that carrying mortgage debt into traditional retirement ages may impede optimal retirement preparation. This life-cycle pattern might reflect a selection effect where financially stable households are more likely to qualify for mortgages early in their careers, while mortgages in later life could indicate financial stress or wealth-depleting events. The reversal of the positive mortgage effect in later years also suggests that the discipline of regular mortgage payments, while beneficial for wealth accumulation during working years, may become a burden that reduces retirement saving as households approach retirement age.
+
+Student loan debt emerges as the most concerning form of debt for retirement preparedness. Households carrying student debt show substantially lower retirement assets, with preparedness ratios 44% below their debt-free counterparts. This negative association is particularly pronounced for older age groups, with those carrying student debt into their 60s and 70s showing even greater reductions in retirement preparedness. This finding suggests that student debt not only directly competes with retirement saving but may also indicate longer-term financial constraints that impair wealth accumulation over time. The amplified negative effect in older age groups is particularly troubling, as it may represent either persistent personal education debt or loans taken for children's education, both of which can significantly disrupt retirement planning during crucial saving years. The magnitude of this effect highlights how educational financing decisions can have retirement implications that extend decades beyond the initial borrowing decision.
+
+Credit card debt shows a relatively modest and statistically insignificant relationship with retirement preparedness. While the direction of the effect is negative, the magnitude suggests that carrying credit card debt may be less deterministic of retirement preparation than other forms of debt. This finding might reflect the revolving nature of credit card debt or indicate that households across the retirement preparedness spectrum similarly utilize credit cards. The weak relationship could also suggest that credit card debt, unlike student loans or mortgages, is less likely to be a long-term financial commitment that systematically affects retirement saving behavior. Rather, it may represent shorter-term financial management decisions that don't fundamentally alter a household's retirement trajectory. This interpretation aligns with the absence of significant age interaction effects, suggesting that credit card debt's relationship with retirement preparedness remains relatively stable across the life cycle.
+
+Education emerges as a powerful predictor of retirement preparedness. University-educated households show significantly higher retirement preparedness than that of the least educated group, even after controlling for debt status (@fig-retire-edu-level). This educational gradient in retirement preparation likely reflects both higher earning potential and potentially better financial literacy and planning capabilities. The magnitude of this education effect suggests that formal education may provide benefits beyond just higher income potential – it might also develop cognitive skills and planning capabilities that support better long-term financial decision-making. Moreover, the strengthening effect of education across age groups indicates that these advantages compound over time, leading to increasingly divergent retirement outcomes between education groups. This compounding effect could be due to factors such as job stability, more sophisticated investment choices, and more effective use of tax-advantaged retirement vehicles.
+
+## Policy Implications and Recommendations
+These findings suggest several important policy directions for improving retirement preparedness among Canadian households. First, policies should recognize the life-cycle dimension of mortgage debt's relationship with retirement preparation. While mortgage access appears beneficial for building retirement assets in mid-career, programs should encourage accelerated mortgage paydown as households approach retirement age. This could include:
+
+  1. Enhanced financial education programs specifically targeting mortgage planning for pre-retirees
+  2. Tax incentives or other mechanisms to encourage mortgage-free retirement
+  3. Mortgage product innovations that automatically accelerate principal payments in later years
+
+The strong negative association between student debt and retirement preparedness calls for targeted intervention. Policy recommendations include:
+
+  1. Expanding income-based repayment programs to ensure student loan obligations don't crowd out retirement saving
+  2. Creating programs that allow partial loan forgiveness in exchange for demonstrated retirement saving behavior
+  3. Developing integrated saving vehicles that balance student debt repayment with retirement accumulation
+  4. Special consideration for older households carrying student debt, potentially including accelerated forgiveness options
+
+The pronounced education effect on retirement preparedness suggests two policy tracks:
+
+  1. Expanding access to higher education while minimizing associated debt burdens
+  2. Developing targeted financial education programs for those with lower formal education to help close the retirement preparedness gap
+
+## Limitations and Future Research
+Our study's limitations suggest important directions for future research. Our binary treatment of debt status, while revealing key patterns, cannot capture the nuanced effects of different debt levels on retirement preparation. Using debt-to-income ratios in future studies could better illuminate how varying debt burdens influence retirement savings behavior.
+
+The cross-sectional nature of our data limits causal inference. The strong negative associations we observe, particularly with student debt, could reflect both direct effects of debt service on saving capacity and underlying differences in financial circumstances. Longitudinal studies tracking how changes in debt status affect retirement savings over time would help clarify these relationships.
+
+While our retirement preparedness ratio enables cross-household comparisons, it may not fully capture retirement adequacy given varying consumption needs, retirement expectations, and regional living costs. To address these limitations, we propose developing an idealized survey methodology that would:
+
+- Track debt payment histories and their impact on retirement saving decisions
+- Gather data on retirement expectations and planned lifestyle changes
+- Monitor changes in debt status and retirement savings over time
+- Collect information about financial behaviors and attitudes
+
+Such targeted data collection would enhance our understanding of how different types of debt influence retirement preparation throughout the life cycle, providing stronger guidance for policy development and financial planning.
 
 \newpage
 
 \appendix
 
-# Appendix {-}
+# Appendix {.unnumbered}
+# Additional Tables & Figures {#sec-additional-figures}
+```{r}
+#| label: tbl-retire-stats
+#| tbl-cap: "Retirement Preparedness Ratio Summary Statistics"
+#| echo: false
+#| warning: false
+#| message: false
+
+summary(cleaned_data[c("retirement_preparedness", "retirement_preparedness_log")]) %>% kable()
+```
+
+```{r}
+#| label: fig-mortgage-hist
+#| fig-cap: "Distribution of Mortgage Debt Amount"
+#| echo: false
+#| warning: false
+#| message: false
+
+ggplot(cleaned_data, aes(x = pwdprmor)) +
+  geom_histogram(alpha = 0.8, bins = 30) +
+  theme_minimal() +
+  labs(x = "Mortage Debt Amount", y = "Frequency")
+```
+
+```{r}
+#| label: fig-cc-hist
+#| fig-cap: "Distribution of Credit Card Debt Amount"
+#| echo: false
+#| warning: false
+#| message: false
+
+ggplot(cleaned_data, aes(x = pwdstcrd)) +
+  geom_histogram(alpha = 0.8, bins = 30) +
+  theme_minimal() +
+  labs(x = "Credit Card Debt Amount", y = "Frequency")
+```
+
+```{r}
+#| label: fig-student-hist
+#| fig-cap: "Distribution of Student Loan Debt Amount"
+#| echo: false
+#| warning: false
+#| message: false
+
+ggplot(cleaned_data, aes(x = pwdsloan)) +
+  geom_histogram(alpha = 0.8, bins = 30) +
+  theme_minimal() +
+  labs(x = "Student Loan Debt Amount", y = "Frequency")
+```
+
+```{r}
+#| label: fig-retire-age-group
+#| fig-cap: "Average Retirement Preparedness Ratio by Age Group"
+#| echo: false
+#| warning: false
+#| message: false
+
+retire_age_group <- cleaned_data %>%
+  mutate(pagemieg = factor(pagemieg)) %>%
+  group_by(pagemieg) %>%
+  summarise(
+    mean_retire_prep = mean(retirement_preparedness)
+  )
+
+ggplot(retire_age_group, aes(x = pagemieg, y = mean_retire_prep )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_discrete(labels = c("40-44", "45-49", "50-54", "55-59", "60-64", 
+                              "65-69", "70-74", "75-79", "80+")) +
+  labs(x = "Age Group", y = "Average Retirement Preparedness Ratio") +
+  theme_minimal()
+```
+
+```{r}
+#| label: fig-retire-edu-level
+#| fig-cap: "Average Retirement Preparedness Ratio by Education Level"
+#| echo: false
+#| warning: false
+#| message: false
+
+retire_edu_group <- cleaned_data %>%
+  mutate(peducmie = factor(peducmie)) %>%
+  group_by(peducmie) %>%
+  summarise(
+    mean_retire_prep = mean(retirement_preparedness)
+  )
+
+ggplot(retire_edu_group, aes(x = peducmie, y = mean_retire_prep )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_discrete(labels = c("Less than Highschool", "Highschool", "Post-secondary", 
+                              "University", "Not Stated")) +
+  labs(x = "Education Level Attained", y = "Average Retirement Preparedness Ratio") +
+  theme_minimal()
+```
 
 \newpage
-# References {-}
+# Extra Model Details {#sec-model-details}
+## Assumptions
+The model relies on several key assumptions:
+
+1. **Independence**: Observations are assumed to be independent across households, which is reasonable given the survey's sampling design.
+2. **Linearity**: The relationship between log-transformed retirement preparedness and our binary predictors is assumed to be linear, conditional on controls.
+3. **Homoscedasticity**: To address potential heteroscedasticity in financial data, we employ robust standard errors (HC1).
+4. **No Perfect Multicollinearity**: Variance Inflation Factor (VIF) analysis confirms that our simpler binary debt indicators and their interactions do not introduce problematic multicollinearity.
+
+## Robustness Checks
+To ensure the reliability of our results, we implement several robustness checks:
+
+1. **Heteroscedasticity-Consistent Standard Errors**: We use HC1 robust standard errors to account for potential heteroscedasticity in the financial data.
+2. **Sample Restrictions**: The model is estimated on a sample that excludes households with zero retirement preparedness and those with extreme preparedness ratios (below 5th and above 95th percentiles) to ensure results aren't driven by non-savers or outliers.
+3. **Alternative Specifications**: We verify the robustness of our findings by testing alternative age group categorizations and comparing results with and without survey weights.
 
 
+\newpage
+
+# References
